@@ -1,7 +1,10 @@
 package curso.api.rest.models;
 
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 
 import javax.persistence.CascadeType;
@@ -15,12 +18,26 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.JoinTable;
+import javax.persistence.ManyToMany;
+import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
+import javax.persistence.Table;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
 import javax.persistence.UniqueConstraint;
+
+import org.hibernate.annotations.Check;
+import org.hibernate.validator.constraints.br.CPF;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.format.annotation.DateTimeFormat.ISO;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
+@Table(uniqueConstraints={@UniqueConstraint(columnNames={"login","cpf"})})
 public class Usuario implements UserDetails{
 	private static final long serialVersionUID = 1L;
 
@@ -28,20 +45,32 @@ public class Usuario implements UserDetails{
 	@GeneratedValue(strategy = GenerationType.AUTO)
 	private Long id;
 	
-	@Column(unique = true)
+	@Column
 	private String login;
 	
 	private String senha;
 	
 	private String nome;
+	@JsonFormat(pattern = "dd/MM/yyyy")
+	@Temporal(TemporalType.DATE)
+	@DateTimeFormat(iso = ISO.DATE,pattern = "dd/MM/yyyy")
+	private Date dataNascimento;
+	
+	@ManyToOne
+	private Profissao profissao;
+	
+	@Column(unique = true)
+	@CPF(message = "Cpf inválido")
+	private String cpf;
+	
+	private BigDecimal salario;
 	
 	@OneToMany(mappedBy = "usuario",orphanRemoval = true,cascade = CascadeType.ALL)
 	private List<Telefone> telefones;
 	
-	@OneToMany(fetch = FetchType.EAGER)
-	@JoinTable(name = "usuario_role",
-	uniqueConstraints = @UniqueConstraint (columnNames = {"usuario_id" , "role_id"}, name = "unique_role_user"),joinColumns = @JoinColumn(name = "usuario_id", referencedColumnName = "id",table = "usuario", foreignKey = @ForeignKey(name="usuario_fk",value = ConstraintMode.CONSTRAINT)),inverseJoinColumns = @JoinColumn(name="role_id",referencedColumnName = "id",table = "role",foreignKey = @ForeignKey(name="role_fk",value = ConstraintMode.CONSTRAINT)) )
-	private List<Role> roles;
+	@ManyToMany(fetch = FetchType.EAGER) 
+	@JoinTable(name = "usuario_role", joinColumns = @JoinColumn(name = "usuario_id", referencedColumnName = "id", table = "usuario", unique = false, foreignKey = @ForeignKey(name = "usuario_fk", value = ConstraintMode.CONSTRAINT)), inverseJoinColumns = @JoinColumn(name = "role_id", referencedColumnName = "id", table = "role", unique = false, updatable = false, foreignKey = @ForeignKey(name = "role_fk", value = ConstraintMode.CONSTRAINT)))   
+	private List<Role> roles = new ArrayList<Role>();
 	
 	public Long getId() {
 		return id;
@@ -73,6 +102,31 @@ public class Usuario implements UserDetails{
 
 	public void setNome(String nome) {
 		this.nome = nome;
+	}
+	
+	public void setCpf(String cpf) {
+		this.cpf = cpf;
+	}
+	public String getCpf() {
+		return cpf;
+	}
+	public Date getDataNascimento() {
+		return dataNascimento;
+	}
+	public void setDataNascimento(Date dataNascimento) {
+		this.dataNascimento = dataNascimento;
+	}
+	public void setProfissao(Profissao profissao) {
+		this.profissao = profissao;
+	}
+	public Profissao getProfissao() {
+		return profissao;
+	}
+	public BigDecimal getSalario() {
+		return salario;
+	}
+	public void setSalario(BigDecimal salario) {
+		this.salario = salario;
 	}
 
 	@Override
@@ -109,6 +163,7 @@ public class Usuario implements UserDetails{
 	}
 
 	@Override
+	@JsonIgnore
 	public Collection<? extends GrantedAuthority> getAuthorities() {
 		return this.roles;
 	}

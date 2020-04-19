@@ -1,4 +1,4 @@
-package curso.api.rest.repository;
+package curso.api.rest.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.User;
@@ -8,6 +8,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Repository;
 
 import curso.api.rest.models.Usuario;
+import curso.api.rest.repository.UsuarioRepository;
 @Repository
 public class ImplementacaoUserDetailsService implements UserDetailsService{
 	
@@ -22,5 +23,8 @@ public class ImplementacaoUserDetailsService implements UserDetailsService{
 		}
 		return new User(usuario.getLogin(),usuario.getPassword(),usuario.getAuthorities());
 	}
-
+	
+	public void adicionarRole(Long id) {
+		repository.addRole(id);
+	}
 }

@@ -4,8 +4,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.tomcat.util.codec.binary.Base64;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CachePut;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -19,7 +27,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import curso.api.rest.models.Usuario;
+import curso.api.rest.repository.TelefoneRepository;
 import curso.api.rest.repository.UsuarioRepository;
+import curso.api.rest.service.ImplementacaoUserDetailsService;
+import curso.api.rest.service.ServiceRelatorio;
 @CrossOrigin(origins = "*")
 @RestController
 @RequestMapping(value = "/usuario")
@@ -28,6 +39,15 @@ public class IndexController {
 	@Autowired
 	private UsuarioRepository repository;
 	
+	@Autowired
+	private ImplementacaoUserDetailsService impservice;
+	
+	@Autowired
+	private TelefoneRepository trepository;
+	
+	@Autowired
+	private ServiceRelatorio serviceRelatorio;
+	
 	@GetMapping(value = "/{id}",produces = "application/json")
 	public ResponseEntity<Usuario> init(@PathVariable("id") Long id) {
 		Optional<Usuario> usuario = repository.findById(id);
@@ -35,26 +55,74 @@ public class IndexController {
 	}
 	@GetMapping(value = "/",produces = "application/json")
 	@CachePut("cacheusuarios")
-	public ResponseEntity<List<Usuario>> usuarios(){
-		List<Usuario> usuarios = new ArrayList<Usuario>();
-		usuarios = repository.findAll();
-		return ResponseEntity.ok(usuarios);
+	public ResponseEntity<Page<Usuario>> usuarios() throws InterruptedException{
+		PageRequest page = PageRequest.of(0, 5, Sort.by("nome"));
+		
+		Page<Usuario> list = repository.findAll(page);
+		
+		return ResponseEntity.ok(list);
 	}
-	
+	@GetMapping(value = "/page/{pagina}",produces = "application/json")
+	@CachePut("cacheusuarios")
+	public ResponseEntity<Page<Usuario>> pages(@PathVariable("pagina") int pagina) throws InterruptedException{
+		PageRequest page = PageRequest.of(pagina, 5, Sort.by("nome"));
+		
+		Page<Usuario> list = repository.findAll(page);
+		
+		return ResponseEntity.ok(list);
+	}
+	@GetMapping(value = "/filtro/{nome}",produces = "application/json")
+	public ResponseEntity<Page<Usuario>> usuariosame(@PathVariable("nome") String nome){
+		PageRequest lista = null;
+		Page<Usuario> list =null;
+		if(nome == null ||(nome != null && nome.trim().isEmpty()) || nome.equalsIgnoreCase("undefined") ) {
+			lista = PageRequest.of(0, 5, Sort.by("nome"));
+			list = repository.findAll(lista);
+		}else {
+			lista = PageRequest.of(0, 5, Sort.by("nome"));
+			list = repository.findUserByNamePage(nome,lista);
+		}
+		
+		return ResponseEntity.ok(list);
+	}
+	@GetMapping(value = "/filtro/{nome}/page/{page}",produces = "application/json")
+	public ResponseEntity<Page<Usuario>> usuariospage(@PathVariable("nome") String nome, @PathVariable("page") int page){
+		PageRequest lista = null;
+		Page<Usuario> list =null;
+		if(nome == null ||(nome != null && nome.trim().isEmpty()) || nome.equalsIgnoreCase("undefined") ) {
+			lista = PageRequest.of(page, 5, Sort.by("nome"));
+			list = repository.findAll(lista);
+		}else {
+			lista = PageRequest.of(page, 5, Sort.by("nome"));
+			list = repository.findUserByNamePage(nome,lista);
+		}
+		
+		return ResponseEntity.ok(list);
+	}
 	@PostMapping(value = "/",produces = "application/json")
-	public ResponseEntity<Usuario> cadastrar(@RequestBody Usuario usuario){
-		for(int pos=0;pos<usuario.getTelefones().size(); pos++){
-			usuario.getTelefones().get(pos).setUsuario(usuario);
+	public ResponseEntity<Usuario> cadastrar(@RequestBody Usuario usuario) throws DataIntegrityViolationException{
+		if(usuario.getTelefones() != null) {
+			for(int pos=0;pos<usuario.getTelefones().size(); pos++){
+				usuario.getTelefones().get(pos).setUsuario(usuario);
+			}
 		}
 		String senhaCripto =new BCryptPasswordEncoder().encode(usuario.getSenha());
 		usuario.setSenha(senhaCripto);
 		Usuario usuarioSalvo = repository.save(usuario);
+		impservice.adicionarRole(usuarioSalvo.getId());
 		return ResponseEntity.ok(usuarioSalvo);
 	}
 	@PutMapping(value="/",produces = "application/json")
 	public ResponseEntity<Usuario> editar(@RequestBody Usuario usuario){
-		for(int pos=0;pos<usuario.getTelefones().size(); pos++){
-			usuario.getTelefones().get(pos).setUsuario(usuario);
+		if(usuario.getTelefones() != null) {
+			for(int pos=0;pos<usuario.getTelefones().size(); pos++){
+				usuario.getTelefones().get(pos).setUsuario(usuario);
+			}
+		}
+		Usuario userTemporario = repository.findById(usuario.getId()).get();
+		if(!userTemporario.getSenha().toString().trim().equals(usuario.getSenha())) {
+			String senha = new BCryptPasswordEncoder().encode(usuario.getSenha());
+			usuario.setSenha(senha);
 		}
 		Usuario usuarioEditado = repository.save(usuario);
 		return ResponseEntity.ok(usuarioEditado);
@@ -63,5 +131,16 @@ public class IndexController {
 	public String delete(@PathVariable("id")Long id ){
 		repository.deleteById(id);
 		return "Usuario deletado com sucesso";
+	}
+	@DeleteMapping(value="/telefone/{id}",produces="application/text")
+	public String deleteTelefone(@PathVariable("id")Long id) {
+		trepository.deleteById(id);
+		return "ok";
+	}
+	@GetMapping(value = "/relatorio",produces="application/text")
+	public ResponseEntity<String> downloadRelatorio(HttpServletRequest request) throws Exception{
+		byte[] pdf = serviceRelatorio.gerarRelatorio("angular", request.getServletContext());
+		String base64_pdf = "data:application/pdf;base64," + Base64.encodeBase64String(pdf);
+		return new ResponseEntity<String>(base64_pdf,HttpStatus.OK);
 	}
 }

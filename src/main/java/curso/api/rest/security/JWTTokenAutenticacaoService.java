@@ -41,7 +41,7 @@ public class JWTTokenAutenticacaoService {
 	public Authentication getAuthentication(HttpServletRequest request, HttpServletResponse response) throws IOException {
 		String token = request.getHeader(HEADER_STRING);
 		
-		if(token !=null) {
+		if(token != null) {
 			String user = Jwts.parser().setSigningKey(SECRET).parseClaimsJws(token.replace(TOKEN_PREFIX, "")).getBody().getSubject();
 			if(user !=null) {
 				Usuario usuario = ApplicationContextLoad.getApplicationContext().getBean(UsuarioRepository.class).findUserByLogin(user);
