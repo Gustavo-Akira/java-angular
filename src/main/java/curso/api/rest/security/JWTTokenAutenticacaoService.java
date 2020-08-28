@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import curso.api.rest.ApplicationContextLoad;
 import curso.api.rest.models.Usuario;
 import curso.api.rest.repository.UsuarioRepository;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 
@@ -40,7 +41,7 @@ public class JWTTokenAutenticacaoService {
 	}
 	public Authentication getAuthentication(HttpServletRequest request, HttpServletResponse response) throws IOException {
 		String token = request.getHeader(HEADER_STRING);
-		
+		try {
 		if(token != null) {
 			String user = Jwts.parser().setSigningKey(SECRET).parseClaimsJws(token.replace(TOKEN_PREFIX, "")).getBody().getSubject();
 			if(user !=null) {
@@ -51,6 +52,13 @@ public class JWTTokenAutenticacaoService {
 				
 			}
 			
+		}
+		}catch(ExpiredJwtException e) {
+			try{
+				response.getOutputStream().println("Your Token expired, please do login again to refresh your token");
+			}catch(IOException){
+				
+			}
 		}
 		corsLiberation(response);
 		return null;

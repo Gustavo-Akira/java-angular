@@ -36,7 +36,7 @@ public class ControlerExcecoes extends ResponseEntityExceptionHandler{
 		}
 		ObjetoError objetoError = new ObjetoError();
 		objetoError.setError(msg);
-		objetoError.setCode(status.value()+ "==>" + status.getReasonPhrase());
+		objetoError.setCode(status.value()+ "=>" + status.getReasonPhrase());
 		return new ResponseEntity<>(objetoError, headers, status);
 	}
 	

@@ -8,6 +8,7 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.apache.tomcat.util.codec.binary.Base64;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import curso.api.rest.models.UserChart;
 import curso.api.rest.models.Usuario;
 import curso.api.rest.repository.TelefoneRepository;
 import curso.api.rest.repository.UsuarioRepository;
@@ -48,6 +51,9 @@ public class IndexController {
 	@Autowired
 	private ServiceRelatorio serviceRelatorio;
 	
+	@Autowired
+	private JdbcTemplate jdbc;
+	
 	@GetMapping(value = "/{id}",produces = "application/json")
 	public ResponseEntity<Usuario> init(@PathVariable("id") Long id) {
 		Optional<Usuario> usuario = repository.findById(id);
@@ -63,7 +69,8 @@ public class IndexController {
 		return ResponseEntity.ok(list);
 	}
 	@GetMapping(value = "/page/{pagina}",produces = "application/json")
-	@CachePut("cacheusuarios")
+	@CacheEvict(value="cacheusuarios",allEntries=true)
+	@CachePut
 	public ResponseEntity<Page<Usuario>> pages(@PathVariable("pagina") int pagina) throws InterruptedException{
 		PageRequest page = PageRequest.of(pagina, 5, Sort.by("nome"));
 		
@@ -142,5 +149,19 @@ public class IndexController {
 		byte[] pdf = serviceRelatorio.gerarRelatorio("angular", request.getServletContext());
 		String base64_pdf = "data:application/pdf;base64," + Base64.encodeBase64String(pdf);
 		return new ResponseEntity<String>(base64_pdf,HttpStatus.OK);
+	}
+	@GetMapping(value="/chart",produces = "application/json")
+	public ResponseEntity<UserChart> grafico(){
+		UserChart userchart = new UserChart();
+		List<String> resultado = jdbc.queryForList("select array_agg(''''||nome||'''') from usuario where salario > 0 and nome <> '' union all select cast(array_agg(salario) as character varying[]) from usuario where salario > 0  and nome <> ''", String.class);
+		System.out.println(resultado);
+		if(!resultado.isEmpty()) {
+			String nomes = resultado.get(0).replaceAll("\\{", "").replaceAll("\\}", "");
+			String salarios = resultado.get(1).replaceAll("\\{", "").replaceAll("\\}", "");
+			
+			userchart.setNomeFuncionario(nomes);
+			userchart.setSalario(salarios);
+		}
+		return new ResponseEntity<UserChart>(userchart,HttpStatus.OK);
 	}
 }

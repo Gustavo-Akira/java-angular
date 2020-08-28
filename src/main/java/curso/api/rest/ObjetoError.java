@@ -3,6 +3,7 @@ package curso.api.rest;
 public class ObjetoError {
 	private String error;
 	private String code;
+	
 	public String getError() {
 		return error;
 	}
@@ -15,5 +16,7 @@ public class ObjetoError {
 	public void setCode(String code) {
 		this.code = code;
 	}
+	
+	
 	
 }
